@@ -22,9 +22,12 @@ Integrate the [opencode](https://github.com/sst/opencode) AI assistant with Neov
 
 ### [lazy.nvim](https://github.com/folke/lazy.nvim)
 
+This example demonstrates the use of a `project_root` option that is under development.
+
 ```lua
 {
-  "NickvanDyke/opencode.nvim",
+  "FlippingBinary/opencode.nvim",
+  branch = "feat/project-root",
   dependencies = {
     -- Recommended for `ask()` and `select()`.
     -- Required for `snacks` provider.
@@ -34,6 +37,11 @@ Integrate the [opencode](https://github.com/sst/opencode) AI assistant with Neov
   config = function()
     ---@type opencode.Opts
     vim.g.opencode_opts = {
+      project_root = function()
+        -- This would be for a LazyVim user. Other users may want a different project
+        -- root detection method.
+        return LazyVim.root()
+      end,
       -- Your configuration, if any — see `lua/opencode/config.lua`, or "goto definition" on the type or field.
     }
 
