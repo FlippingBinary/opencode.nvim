@@ -2,6 +2,7 @@
 ---@class opencode.provider.Terminal : opencode.Provider
 ---
 ---@field opts opencode.provider.terminal.Opts
+---@field cwd string
 ---
 ---@field bufnr? integer
 ---@field winid? integer
@@ -11,9 +12,12 @@ Terminal.name = "terminal"
 
 ---@class opencode.provider.terminal.Opts : vim.api.keyset.win_config
 
-function Terminal.new(opts)
+---@param opts? opencode.provider.terminal.Opts
+---@param cwd string
+function Terminal.new(opts, cwd)
   local self = setmetatable({}, Terminal)
   self.opts = opts or {}
+  self.cwd = cwd
   self.winid = nil
   self.bufnr = nil
   return self
@@ -65,6 +69,7 @@ function Terminal:start()
 
     vim.fn.jobstart(self.cmd, {
       term = true,
+      cwd = self.cwd,
       on_exit = function()
         self.winid = nil
         self.bufnr = nil

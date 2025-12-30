@@ -4,6 +4,7 @@
 ---@class opencode.provider.Snacks : opencode.Provider
 ---
 ---@field opts snacks.terminal.Opts
+---@field cwd string
 local Snacks = {}
 Snacks.__index = Snacks
 Snacks.name = "snacks"
@@ -11,10 +12,12 @@ Snacks.name = "snacks"
 ---@class opencode.provider.snacks.Opts : snacks.terminal.Opts
 
 ---@param opts? opencode.provider.snacks.Opts
+---@param cwd string
 ---@return opencode.provider.Snacks
-function Snacks.new(opts)
+function Snacks.new(opts, cwd)
   local self = setmetatable({}, Snacks)
-  self.opts = opts or {}
+  self.opts = vim.tbl_deep_extend("force", opts or {}, { cwd = cwd })
+  self.cwd = cwd
   return self
 end
 

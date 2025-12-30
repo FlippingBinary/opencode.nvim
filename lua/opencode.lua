@@ -8,9 +8,26 @@ M.prompt = require("opencode.api.prompt").prompt
 M.operator = require("opencode.api.operator").operator
 M.command = require("opencode.api.command").command
 
-M.toggle = require("opencode.provider").toggle
-M.start = require("opencode.provider").start
-M.stop = require("opencode.provider").stop
+---@class opencode.provider.action.Opts
+---@field cwd? string The project root directory to use.
+
+---@param opts? opencode.provider.action.Opts
+function M.toggle(opts)
+  local cwd = require("opencode.config").get_project_root({ cwd = opts and opts.cwd })
+  require("opencode.provider").toggle(cwd)
+end
+
+---@param opts? opencode.provider.action.Opts
+function M.start(opts)
+  local cwd = require("opencode.config").get_project_root({ cwd = opts and opts.cwd })
+  require("opencode.provider").start(cwd)
+end
+
+---@param opts? opencode.provider.action.Opts
+function M.stop(opts)
+  local cwd = require("opencode.config").get_project_root({ cwd = opts and opts.cwd })
+  require("opencode.provider").stop(cwd)
+end
 
 M.statusline = require("opencode.status").statusline
 

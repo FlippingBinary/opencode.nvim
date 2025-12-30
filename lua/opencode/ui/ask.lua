@@ -27,6 +27,10 @@ function M.ask(default, opts)
   opts = opts or {}
   opts.context = opts.context or require("opencode.context").new()
 
+  local config = require("opencode.config")
+  local cwd = config.get_project_root({ cwd = opts.cwd })
+  opts.cwd = cwd
+
   ---@type snacks.input.Opts
   local input_opts = {
     default = default,
@@ -69,7 +73,7 @@ function M.ask(default, opts)
   input_opts = vim.tbl_deep_extend("force", input_opts, require("opencode.config").opts.ask.snacks)
 
   require("opencode.cli.server")
-    .get_port()
+    .get_port(cwd)
     :next(function(port)
       return require("opencode.promise").new(function(resolve)
         require("opencode.cli.client").get_agents(port, function(agents)

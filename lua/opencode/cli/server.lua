@@ -173,22 +173,22 @@ local function is_descendant_of_neovim(pid)
   return false
 end
 
+---@param target_cwd string
 ---@return opencode.cli.server.Server
-local function find_server_inside_nvim_cwd()
+local function find_server_for_cwd(target_cwd)
   local found_server
-  local nvim_cwd = vim.fn.getcwd()
   for _, server in ipairs(find_servers()) do
     local normalized_server_cwd = server.cwd
-    local normalized_nvim_cwd = nvim_cwd
+    local normalized_target_cwd = target_cwd
 
     if is_windows() then
       -- On Windows, normalize to backslashes for consistent comparison
       normalized_server_cwd = server.cwd:gsub("/", "\\")
-      normalized_nvim_cwd = nvim_cwd:gsub("/", "\\")
+      normalized_target_cwd = target_cwd:gsub("/", "\\")
     end
 
     -- CWDs match exactly, or `opencode`'s CWD is under neovim's CWD.
-    if normalized_server_cwd:find(normalized_nvim_cwd, 1, true) == 1 then
+    if normalized_server_cwd:find(normalized_target_cwd, 1, true) == 1 then
       found_server = server
       -- On Unix, prioritize embedded
       if not is_windows() and is_descendant_of_neovim(server.pid) then
@@ -198,7 +198,7 @@ local function find_server_inside_nvim_cwd()
   end
 
   if not found_server then
-    error("No `opencode` servers inside Neovim's CWD", 0)
+    error("No `opencode` servers inside target CWD: " .. target_cwd, 0)
   end
 
   return found_server
@@ -241,27 +241,28 @@ end
 
 ---Attempt to get the `opencode` server's port. Tries, in order:
 ---1. A process responding on `opts.port`.
----2. Any `opencode` process running inside Neovim's CWD. Prioritizes embedded.
+---2. Any `opencode` process running inside the target CWD. Prioritizes embedded.
 ---3. Calling `opts.provider.start` and polling for the port.
----
+---@param cwd string The project root directory to find/start opencode in.
 ---@param launch boolean? Whether to launch a new server if none found. Defaults to true.
-function M.get_port(launch)
-  launch = launch ~= false
+---@return opencode.Promise
+function M.get_port(cwd, launch)
+  if launch == nil then
+    launch = true
+  end
 
   return require("opencode.promise").new(function(resolve, reject)
     local configured_port = require("opencode.config").opts.port
-    local find_port_fn = function()
-      if configured_port then
-        -- Test the configured port
-        local ok, path = pcall(require("opencode.cli.client").get_path, configured_port)
-        if ok and path then
-          return configured_port
-        else
-          error("No `opencode` responding on configured port: " .. configured_port, 0)
-        end
+    local find_port_fn = configured_port and function()
+      -- Test the configured port
+      local ok, path = pcall(require("opencode.cli.client").get_path, configured_port)
+      if ok and path then
+        return configured_port
       else
-        return find_server_inside_nvim_cwd().port
+        error("No `opencode` responding on configured port: " .. configured_port, 0)
       end
+    end or function()
+      return find_server_for_cwd(cwd).port
     end
 
     local initial_ok, initial_result = pcall(find_port_fn)
@@ -273,7 +274,7 @@ function M.get_port(launch)
     if launch then
       vim.notify(initial_result .. " — starting `opencode`…", vim.log.levels.INFO, { title = "opencode" })
 
-      local start_ok, start_result = pcall(require("opencode.provider").start)
+      local start_ok, start_result = pcall(require("opencode.provider").start, cwd)
       if not start_ok then
         reject("Error starting `opencode`: " .. start_result)
         return

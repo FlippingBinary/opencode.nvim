@@ -2,6 +2,7 @@
 ---@class opencode.provider.Wezterm : opencode.Provider
 ---
 ---@field opts opencode.provider.wezterm.Opts
+---@field cwd string
 ---@field pane_id? string The `wezterm` pane ID where `opencode` is running (internal use only).
 local Wezterm = {}
 Wezterm.__index = Wezterm
@@ -22,10 +23,12 @@ Wezterm.name = "wezterm"
 ---@field top_level? boolean
 
 ---@param opts? opencode.provider.wezterm.Opts
+---@param cwd string
 ---@return opencode.provider.Wezterm
-function Wezterm.new(opts)
+function Wezterm.new(opts, cwd)
   local self = setmetatable({}, Wezterm)
   self.opts = opts or {}
+  self.cwd = cwd
   self.pane_id = nil
   return self
 end
@@ -120,6 +123,9 @@ function Wezterm:start()
     if self.opts.top_level then
       table.insert(cmd_parts, "--top-level")
     end
+
+    table.insert(cmd_parts, "--cwd")
+    table.insert(cmd_parts, self.cwd)
 
     table.insert(cmd_parts, "--")
     table.insert(cmd_parts, self.cmd)

@@ -13,18 +13,22 @@ local M = {}
 ---| "󱚡"
 ---| "󱚧"
 
----@type opencode.status.Status|nil
-M.status = nil
+---@type table<string, opencode.status.Status>
+M.statuses = {}
 
+---@param cwd? string
 ---@return opencode.status.Icon
-function M.statusline()
-  if M.status == "idle" then
+function M.statusline(cwd)
+  cwd = cwd or require("opencode.config").get_project_root()
+  local status = M.statuses[cwd]
+
+  if status == "idle" then
     return "󰚩"
-  elseif M.status == "responding" then
+  elseif status == "responding" then
     return "󱜙"
-  elseif M.status == "requesting_permission" then
+  elseif status == "requesting_permission" then
     return "󱚟"
-  elseif M.status == "error" then
+  elseif status == "error" then
     return "󱚡"
   else
     return "󱚧"
@@ -32,7 +36,8 @@ function M.statusline()
 end
 
 ---@param event opencode.cli.client.Event
-function M.update(event)
+---@param cwd string
+function M.update(event, cwd)
   if
     event.type == "server.connected"
     or event.type == "session.idle"
@@ -43,20 +48,19 @@ function M.update(event)
     -- Pretty good fallback
     or event.type == "session.heartbeat"
   then
-    M.status = "idle"
+    M.statuses[cwd] = "idle"
   elseif
     event.type == "message.updated"
     or event.type == "message.part.updated"
     or event.type == "permission.replied"
   then
-    M.status = "responding"
+    M.statuses[cwd] = "responding"
   elseif event.type == "permission.updated" then
-    M.status = "requesting_permission"
+    M.statuses[cwd] = "requesting_permission"
   elseif event.type == "session.error" then
-    M.status = "error"
+    M.statuses[cwd] = "error"
   elseif event.type == "server.disconnected" then
-    -- NOTE: *we* send server.disconnected when unsubscribing or `opencode`'s heartbeat disappears
-    M.status = nil
+    M.statuses[cwd] = nil
   end
 end
 

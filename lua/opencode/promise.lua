@@ -1,6 +1,16 @@
 ---https://github.com/Billiam/promise.lua
 ---TODO: Consider coroutines (deep refactor).
 
+---@class opencode.Promise
+---@field is_promise boolean
+---@field state "pending"|"fulfilled"|"rejected"
+---@field value any
+---@field queue table[]
+---@field ["next"] fun(self: opencode.Promise, on_fulfilled: nil|fun(value: any): any|opencode.Promise, on_rejected: nil|fun(reason: any): any|opencode.Promise): opencode.Promise
+---@field catch fun(self: opencode.Promise, callback: fun(reason: any): any|opencode.Promise): opencode.Promise
+---@field resolve fun(self: opencode.Promise, value: any)
+---@field reject fun(self: opencode.Promise, reason: any)
+
 local queue = {}
 
 local State = {

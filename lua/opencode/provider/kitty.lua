@@ -3,6 +3,7 @@
 ---@class opencode.provider.Kitty : opencode.Provider
 ---
 ---@field opts opencode.provider.kitty.Opts
+---@field cwd string
 ---
 ---The `kitty` window ID where `opencode` is running (internal use only).
 ---@field window_id? number
@@ -24,10 +25,12 @@ Kitty.name = "kitty"
 ---@field password? string
 ---
 ---@param opts? opencode.provider.kitty.Opts
+---@param cwd string
 ---@return opencode.provider.Kitty
-function Kitty.new(opts)
+function Kitty.new(opts, cwd)
   local self = setmetatable({}, Kitty)
   self.opts = opts or {}
+  self.cwd = cwd
   self.window_id = nil
   return self
 end
@@ -103,7 +106,7 @@ function Kitty:start()
   end
 
   local location = self.opts.location
-  local launch_cmd = { "launch", "--cwd=current", "--hold", "--dont-take-focus" }
+  local launch_cmd = { "launch", "--cwd=" .. self.cwd, "--hold", "--dont-take-focus" }
 
   -- Input validation for `location` option
   local VALID_LOCATIONS = {

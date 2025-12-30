@@ -4,7 +4,8 @@ vim.api.nvim_create_autocmd("User", {
   callback = function(args)
     ---@type opencode.cli.client.Event
     local event = args.data.event
-    require("opencode.status").update(event)
+    local cwd = args.data.cwd
+    require("opencode.status").update(event, cwd)
   end,
   desc = "Update opencode status",
 })

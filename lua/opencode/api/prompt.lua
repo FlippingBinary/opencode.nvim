@@ -1,6 +1,7 @@
 local M = {}
 
 ---@class opencode.api.prompt.Opts
+---@field cwd? string The project root directory to use.
 ---@field clear? boolean Clear the TUI input before.
 ---@field submit? boolean Submit the TUI input after.
 ---@field context? opencode.Context The context the prompt is being made in.
@@ -15,16 +16,20 @@ local M = {}
 ---@param opts? opencode.api.prompt.Opts
 function M.prompt(prompt, opts)
   -- TODO: Referencing `ask = true` prompts doesn't actually ask.
-  local referenced_prompt = require("opencode.config").opts.prompts[prompt]
+  local config = require("opencode.config")
+  local referenced_prompt = config.opts.prompts[prompt]
   prompt = referenced_prompt and referenced_prompt.prompt or prompt
+
+  local cwd = config.get_project_root({ cwd = opts and opts.cwd })
   opts = {
+    cwd = cwd,
     clear = opts and opts.clear or false,
     submit = opts and opts.submit or false,
     context = opts and opts.context or require("opencode.context").new(),
   }
 
   require("opencode.cli.server")
-    .get_port()
+    .get_port(cwd)
     :next(function(port)
       if opts.clear then
         return require("opencode.promise").new(function(resolve)
@@ -45,7 +50,7 @@ function M.prompt(prompt, opts)
       end)
     end)
     :next(function(port)
-      require("opencode.events").subscribe()
+      require("opencode.events").subscribe(cwd)
 
       if opts.submit then
         require("opencode.cli.client").tui_execute_command("prompt.submit", port)

@@ -4,6 +4,9 @@ local M = {}
 
 ---@class opencode.select.Opts : snacks.picker.ui_select.Opts
 ---
+---The project root directory to use.
+---@field cwd? string
+---
 ---Configure the displayed sections.
 ---@field sections? opencode.select.sections.Opts
 
@@ -31,16 +34,20 @@ local M = {}
 ---
 ---@param opts? opencode.select.Opts Override configured options for this call.
 function M.select(opts)
-  opts = vim.tbl_deep_extend("force", require("opencode.config").opts.select or {}, opts or {})
-  if not require("opencode.config").provider then
+  local config = require("opencode.config")
+  opts = vim.tbl_deep_extend("force", config.opts.select or {}, opts or {})
+  if not config.provider then
     opts.sections.provider = false
   end
+
+  local cwd = config.get_project_root({ cwd = opts.cwd })
+  opts.cwd = cwd
 
   -- TODO: Should merge with prompts' optional contexts
   local context = require("opencode.context").new()
 
   require("opencode.cli.server")
-    .get_port()
+    .get_port(cwd)
     :next(function(port)
       if opts.sections.prompts then
         return require("opencode.promise").new(function(resolve)
@@ -215,20 +222,21 @@ function M.select(opts)
           ---@type opencode.Prompt
           local prompt = require("opencode.config").opts.prompts[choice.name]
           prompt.context = context
+          prompt.cwd = cwd
           if prompt.ask then
             require("opencode").ask(prompt.prompt, prompt)
           else
             require("opencode").prompt(prompt.prompt, prompt)
           end
         elseif choice.__type == "command" then
-          require("opencode").command(choice.name)
+          require("opencode").command(choice.name, { cwd = cwd })
         elseif choice.__type == "provider" then
           if choice.name == "toggle" then
-            require("opencode").toggle()
+            require("opencode").toggle({ cwd = cwd })
           elseif choice.name == "start" then
-            require("opencode").start()
+            require("opencode").start({ cwd = cwd })
           elseif choice.name == "stop" then
-            require("opencode").stop()
+            require("opencode").stop({ cwd = cwd })
           end
         end
       end)

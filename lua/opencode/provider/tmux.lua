@@ -2,6 +2,7 @@
 ---@class opencode.provider.Tmux : opencode.Provider
 ---
 ---@field opts opencode.provider.tmux.Opts
+---@field cwd string
 ---
 ---The `tmux` pane ID where `opencode` is running (internal use only).
 ---@field pane_id? string
@@ -15,10 +16,12 @@ Tmux.name = "tmux"
 ---@field options? string
 
 ---@param opts? opencode.provider.tmux.Opts
+---@param cwd string
 ---@return opencode.provider.Tmux
-function Tmux.new(opts)
+function Tmux.new(opts, cwd)
   local self = setmetatable({}, Tmux)
   self.opts = opts or {}
+  self.cwd = cwd
   self.pane_id = nil
   return self
 end
@@ -75,7 +78,7 @@ function Tmux:start()
   if not pane_id then
     -- Create new pane
     self.pane_id =
-      vim.fn.system(string.format("tmux split-window -d -P -F '#{pane_id}' %s '%s'", self.opts.options, self.cmd))
+      vim.fn.system(string.format("tmux split-window -d -P -F '#{pane_id}' -c '%s' %s '%s'", self.cwd, self.opts.options, self.cmd))
   end
 end
 

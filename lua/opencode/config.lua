@@ -18,6 +18,12 @@ vim.g.opencode_opts = vim.g.opencode_opts
 ---If set, `opencode.nvim` will append `--port <port>` to `provider.cmd`.
 ---@field port? number
 ---
+---The project root directory for `opencode`.
+---If `nil`, uses Neovim's current working directory (`vim.fn.getcwd()`).
+---Can be a string path or a function that returns a string path.
+---Each unique project root gets its own `opencode` instance.
+---@field project_root? string|fun(): string
+---
 ---Contexts to inject into prompts, keyed by their placeholder.
 ---@field contexts? table<string, fun(context: opencode.Context): string|nil>
 ---
@@ -45,6 +51,7 @@ vim.g.opencode_opts = vim.g.opencode_opts
 ---@type opencode.Opts
 local defaults = {
   port = nil,
+  project_root = nil,
   -- stylua: ignore
   contexts = {
     ["@this"] = function(context) return context:this() end,
@@ -165,6 +172,25 @@ local defaults = {
 ---@type opencode.Opts
 M.opts = vim.tbl_deep_extend("force", vim.deepcopy(defaults), vim.g.opencode_opts or {})
 
+---Resolve the project root directory.
+---Priority: opts.cwd > config.project_root > vim.fn.getcwd()
+---@param opts? { cwd?: string }
+---@return string
+function M.get_project_root(opts)
+  if opts and opts.cwd then
+    return opts.cwd
+  end
+
+  local project_root = M.opts.project_root
+  if type(project_root) == "function" then
+    return project_root()
+  elseif type(project_root) == "string" then
+    return project_root
+  end
+
+  return vim.fn.getcwd()
+end
+
 -- Allow removing default `contexts` and `prompts` by setting them to `false` in your user config.
 -- TODO: Add to type definition, and apply to `opts.select.commands`.
 local user_opts = vim.g.opencode_opts or {}
@@ -179,9 +205,8 @@ for _, field in ipairs({ "contexts", "prompts" }) do
 end
 
 ---The `opencode` provider resolved from `opts.provider`.
----
----Retains the base `provider.cmd` if not overridden.
----Sets `--port <port>` in `provider.cmd` if `opts.port` is set.
+---Used only for health check (can this provider type work at all).
+---Actual provider instances are managed by provider/init.lua keyed by cwd.
 ---@type opencode.Provider|nil
 M.provider = (function()
   local provider
@@ -206,7 +231,7 @@ M.provider = (function()
     end
 
     local resolved_provider_opts = provider_or_opts[provider_or_opts.enabled]
-    provider = resolved_provider.new(resolved_provider_opts)
+    provider = resolved_provider.new(resolved_provider_opts, vim.fn.getcwd())
 
     provider.cmd = provider.cmd or provider_or_opts.cmd
   end

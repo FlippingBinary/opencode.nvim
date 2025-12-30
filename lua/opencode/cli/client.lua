@@ -3,12 +3,7 @@
 --- - [implementation](https://github.com/sst/opencode/blob/dev/packages/opencode/src/server/server.ts)
 local M = {}
 
-local sse_state = {
-  -- Track the port - `opencode` may have restarted, usually on a new port
-  port = nil,
-  ---@type vim.SystemObj|nil
-  system_object = nil,
-}
+local sse_subscriptions = {}
 
 ---Generate a UUID v4 (cross-platform, no external dependencies)
 ---@return string UUID in format xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
@@ -250,32 +245,50 @@ end
 ---@field properties table
 
 ---Calls the `/event` SSE endpoint and invokes `callback` for each event received.
----Stops any previous subscription, so only one is active at a time.
----
+---Stops any previous subscription keyed by cli, so only one is active at a time.
+---@param cwd string The project root directory this subscription is for.
 ---@param port number
----@param callback fun(response: opencode.cli.client.Event)|nil
-function M.sse_subscribe(port, callback)
-  if sse_state.port ~= port then
-    if sse_state.system_object then
-      sse_state.system_object:kill(9)
-    end
+---@param callback fun(response: opencode.cli.client.Event, cwd: string)|nil
+function M.sse_subscribe(cwd, port, callback)
+  local existing = sse_subscriptions[cwd]
+  if existing and existing.port ~= port then
+    existing.system_object:kill(9)
+    sse_subscriptions[cwd] = nil
+  end
 
-    sse_state = {
+  if not sse_subscriptions[cwd] then
+    sse_subscriptions[cwd] = {
       port = port,
-      system_object = M.call(port, "/event", "GET", nil, callback),
+      system_object = M.call(port, "/event", "GET", nil, function(response)
+        if callback then
+          callback(response, cwd)
+        end
+      end),
     }
   end
 end
 
-function M.sse_unsubscribe()
-  if sse_state.system_object then
-    sse_state.system_object:kill(9)
+---@param cwd string The project root directory to unsubscribe from.
+function M.sse_unsubscribe(cwd)
+  local existing = sse_subscriptions[cwd]
+  if existing and existing.system_object then
+    existing.system_object:kill(9)
   end
+  sse_subscriptions[cwd] = nil
+end
 
-  sse_state = {
-    port = nil,
-    system_object = nil,
-  }
+function M.sse_unsubscribe_all()
+  for _, sub in pairs(sse_subscriptions) do
+    if sub.system_object then
+      sub.system_object:kill(9)
+    end
+  end
+  sse_subscriptions = {}
+end
+
+---@return table<string, { port: number, system_object: vim.SystemObj }>
+function M.sse_get_subscriptions()
+  return sse_subscriptions
 end
 
 return M

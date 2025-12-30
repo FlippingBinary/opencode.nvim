@@ -14,7 +14,10 @@
 ---See all available flags [here](https://opencode.ai/docs/cli/#flags).
 ---@field cmd? string
 ---
----@field new? fun(opts: table): opencode.Provider
+---The cwd this provider instance is for.
+---@field cwd? string
+---
+---@field new? fun(opts: table, cwd: string): opencode.Provider
 ---
 ---Toggle `opencode`.
 ---@field toggle? fun(self: opencode.Provider)
@@ -54,6 +57,8 @@
 
 local M = {}
 
+local provider_instances = {}
+
 ---Get all providers.
 ---@return opencode.Provider[]
 function M.list()
@@ -67,36 +72,103 @@ function M.list()
 end
 
 ---Toggle `opencode` via the configured provider.
-function M.toggle()
-  local provider = require("opencode.config").provider
+---@param cwd string
+---@return opencode.Provider|nil
+function M.get_or_create(cwd)
+  if provider_instances[cwd] then
+    return provider_instances[cwd]
+  end
+
+  local config = require("opencode.config")
+  local provider_or_opts = config.opts.provider
+
+  if not provider_or_opts then
+    return nil
+  end
+
+  local provider
+
+  if provider_or_opts.toggle or provider_or_opts.start or provider_or_opts.stop then
+    ---@cast provider_or_opts opencode.Provider
+    provider = provider_or_opts
+    provider.cwd = cwd
+  elseif provider_or_opts.enabled then
+    local ok, resolved_provider = pcall(require, "opencode.provider." .. provider_or_opts.enabled)
+    if not ok then
+      vim.notify(
+        "Failed to load `opencode` provider '" .. provider_or_opts.enabled .. "': " .. resolved_provider,
+        vim.log.levels.ERROR,
+        { title = "opencode" }
+      )
+      return nil
+    end
+
+    local resolved_provider_opts = provider_or_opts[provider_or_opts.enabled]
+    provider = resolved_provider.new(resolved_provider_opts, cwd)
+    provider.cmd = provider.cmd or provider_or_opts.cmd
+  end
+
+  if provider then
+    local port = config.opts.port
+    if port and provider.cmd and not provider.cmd:find("--port") then
+      provider.cmd = provider.cmd .. " --port " .. tostring(port)
+    end
+
+    provider_instances[cwd] = provider
+  end
+
+  return provider
+end
+
+---@param cwd string
+function M.toggle(cwd)
+  local provider = M.get_or_create(cwd)
   if provider and provider.toggle then
     provider:toggle()
-    require("opencode.events").subscribe()
+    require("opencode.events").subscribe(cwd)
   else
     error("`provider.toggle` unavailable — run `:checkhealth opencode` for details", 0)
   end
 end
 
 ---Start `opencode` via the configured provider.
-function M.start()
-  local provider = require("opencode.config").provider
+---@param cwd string
+function M.start(cwd)
+  local provider = M.get_or_create(cwd)
   if provider and provider.start then
     provider:start()
-    require("opencode.events").subscribe()
+    require("opencode.events").subscribe(cwd)
   else
     error("`provider.start` unavailable — run `:checkhealth opencode` for details", 0)
   end
 end
 
 ---Stop `opencode` via the configured provider.
-function M.stop()
-  local provider = require("opencode.config").provider
+---@param cwd string
+function M.stop(cwd)
+  local provider = provider_instances[cwd]
   if provider and provider.stop then
     provider:stop()
-    require("opencode.events").unsubscribe()
+    require("opencode.events").unsubscribe(cwd)
+    provider_instances[cwd] = nil
   else
     error("`provider.stop` unavailable — run `:checkhealth opencode` for details", 0)
   end
+end
+
+function M.stop_all()
+  for _, provider in pairs(provider_instances) do
+    if provider and provider.stop then
+      provider:stop()
+    end
+  end
+  provider_instances = {}
+  require("opencode.events").unsubscribe_all()
+end
+
+---@return table<string, opencode.Provider>
+function M.get_instances()
+  return provider_instances
 end
 
 return M
